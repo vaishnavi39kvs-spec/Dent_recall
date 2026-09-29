@@ -9,7 +9,10 @@ const root = __dirname;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
 
 async function ensureSchema() {
-  await pool.query(`
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`
     CREATE TABLE IF NOT EXISTS dentrecall_state (
       id integer PRIMARY KEY CHECK (id = 1),
       patients jsonb NOT NULL DEFAULT '[]'::jsonb,
@@ -17,6 +20,45 @@ async function ensureSchema() {
       updated_at timestamptz NOT NULL DEFAULT now()
     )
   `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS dentrecall_patients (
+        id text PRIMARY KEY,
+        data jsonb NOT NULL,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS dentrecall_visits (
+        id text PRIMARY KEY,
+        patient_id text NOT NULL,
+        data jsonb NOT NULL,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
+    const state = await client.query("SELECT patients, visits FROM dentrecall_state WHERE id = 1");
+    const patientCount = await client.query("SELECT COUNT(*)::int AS count FROM dentrecall_patients");
+    if (state.rows[0] && patientCount.rows[0].count === 0 && state.rows[0].patients.length) {
+      for (const patient of state.rows[0].patients) {
+        await client.query(
+          "INSERT INTO dentrecall_patients (id, data) VALUES ($1, $2::jsonb) ON CONFLICT (id) DO NOTHING",
+          [patient.id, JSON.stringify(patient)]
+        );
+      }
+      for (const visit of state.rows[0].visits || []) {
+        await client.query(
+          "INSERT INTO dentrecall_visits (id, patient_id, data) VALUES ($1, $2, $3::jsonb) ON CONFLICT (id) DO NOTHING",
+          [visit.id, visit.patientId, JSON.stringify(visit)]
+        );
+      }
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 function sendJson(res, status, body) {
@@ -41,26 +83,53 @@ function parseBody(req) {
 
 async function handleApi(req, res) {
   if (req.method === "GET" && req.url === "/api/health") {
-    await pool.query("SELECT 1");
-    return sendJson(res, 200, { ok: true, database: "connected" });
+    const result = await pool.query("SELECT current_database() AS name");
+    return sendJson(res, 200, { ok: true, database: "connected", databaseName: result.rows[0].name });
   }
   if (req.method === "GET" && req.url === "/api/state") {
-    const result = await pool.query("SELECT patients, visits FROM dentrecall_state WHERE id = 1");
-    const row = result.rows[0] || { patients: [], visits: [] };
-    return sendJson(res, 200, row);
+    const patients = await pool.query("SELECT data FROM dentrecall_patients ORDER BY updated_at, id");
+    const visits = await pool.query("SELECT data FROM dentrecall_visits ORDER BY updated_at, id");
+    return sendJson(res, 200, {
+      patients: patients.rows.map(row => row.data),
+      visits: visits.rows.map(row => row.data)
+    });
   }
   if (req.method === "POST" && req.url === "/api/state") {
     const data = await parseBody(req);
     if (!Array.isArray(data.patients) || !Array.isArray(data.visits)) {
       return sendJson(res, 400, { error: "patients and visits must be arrays." });
     }
-    await pool.query(
-      `INSERT INTO dentrecall_state (id, patients, visits, updated_at)
-       VALUES (1, $1::jsonb, $2::jsonb, now())
-       ON CONFLICT (id) DO UPDATE SET patients = EXCLUDED.patients,
-       visits = EXCLUDED.visits, updated_at = now()`,
-      [JSON.stringify(data.patients), JSON.stringify(data.visits)]
-    );
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("DELETE FROM dentrecall_visits");
+      await client.query("DELETE FROM dentrecall_patients");
+      for (const patient of data.patients) {
+        await client.query(
+          "INSERT INTO dentrecall_patients (id, data) VALUES ($1, $2::jsonb)",
+          [patient.id, JSON.stringify(patient)]
+        );
+      }
+      for (const visit of data.visits) {
+        await client.query(
+          "INSERT INTO dentrecall_visits (id, patient_id, data) VALUES ($1, $2, $3::jsonb)",
+          [visit.id, visit.patientId, JSON.stringify(visit)]
+        );
+      }
+      await client.query(
+        `INSERT INTO dentrecall_state (id, patients, visits, updated_at)
+         VALUES (1, $1::jsonb, $2::jsonb, now())
+         ON CONFLICT (id) DO UPDATE SET patients = EXCLUDED.patients,
+         visits = EXCLUDED.visits, updated_at = now()`,
+        [JSON.stringify(data.patients), JSON.stringify(data.visits)]
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
     return sendJson(res, 200, { ok: true });
   }
   sendJson(res, 404, { error: "Not found." });
