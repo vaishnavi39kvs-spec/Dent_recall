@@ -499,8 +499,13 @@ function renderDetail(){
     <div class="logic-note mt-3"><i class="bi bi-check-circle me-1"></i><b>Billing logic:</b> estimated bill = consultation + IOPA + treatment cost. Visit charges are added when recorded. Payment is the actual amount received. Balance is recalculated after every visit.</div>
 
     <div class="row g-3 mt-3">
+      <div class="col-md-4"><div class="card-clean p-3"><b>Gender</b><p class="mb-0 mt-1">${esc(p.gender||"—")}</p></div></div>
+      <div class="col-md-8"><div class="card-clean p-3"><b>Address</b><p class="mb-0 mt-1">${esc(p.address||"—")}</p></div></div>
       <div class="col-md-6"><div class="card-clean p-3"><b>Specialization</b><p class="mb-0 mt-1">${esc(p.specialization||"—")}</p></div></div>
       <div class="col-md-6"><div class="card-clean p-3"><b>Tooth number / Area to be treated</b><p class="mb-0 mt-1">${esc(p.toothArea||"—")}</p></div></div>
+      <div class="col-md-4"><div class="card-clean p-3"><b>Consultation charge</b><p class="mb-0 mt-1">${money(p.estimatedConsultationCharge||0)}</p></div></div>
+      <div class="col-md-4"><div class="card-clean p-3"><b>IOPA charge</b><p class="mb-0 mt-1">${money(p.estimatedIopaCharge||0)}</p></div></div>
+      <div class="col-md-4"><div class="card-clean p-3"><b>Treatment cost</b><p class="mb-0 mt-1">${money(p.treatmentCost||0)}</p></div></div>
       <div class="col-md-6"><div class="card-clean p-3"><b>Treatment plan</b><p class="mb-0 mt-1">${esc(p.treatmentPlan||"—")}</p></div></div>
       <div class="col-md-6"><div class="card-clean p-3"><b>Prescription</b><p class="mb-0 mt-1 pre-wrap">${esc(p.prescription||"—")}</p></div></div>
       <div class="col-md-4"><div class="card-clean p-3"><b>Appointment status</b><p class="mb-0 mt-2"><span class="status ${esc(p.appointmentStatus||"pending")}">${esc(p.appointmentStatus||"pending")}</span></p></div></div>
