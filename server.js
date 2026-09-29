@@ -6,6 +6,7 @@ require("dotenv").config();
 
 const port = Number(process.env.PORT || 3000);
 const root = __dirname;
+const profileId = process.env.PROFILE_ID || "f0ad6353-de3e-4b05-aae6-7f0ccc9274bd";
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
 
 async function ensureSchema() {
@@ -13,17 +14,21 @@ async function ensureSchema() {
   try {
     await client.query("BEGIN");
     await client.query(`
-      CREATE TABLE IF NOT EXISTS dentrecall_patients (
+      CREATE TABLE IF NOT EXISTS patients (
+        profile_id uuid NOT NULL,
         id text PRIMARY KEY,
         data jsonb NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now()
       )
     `);
     await client.query(`
-      CREATE TABLE IF NOT EXISTS dentrecall_visits (
+      CREATE TABLE IF NOT EXISTS visits (
+        profile_id uuid NOT NULL,
         id text PRIMARY KEY,
         patient_id text NOT NULL,
         data jsonb NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now()
       )
     `);
@@ -62,8 +67,8 @@ async function handleApi(req, res) {
     return sendJson(res, 200, { ok: true, database: "connected", databaseName: result.rows[0].name });
   }
   if (req.method === "GET" && req.url === "/api/state") {
-    const patients = await pool.query("SELECT data FROM dentrecall_patients ORDER BY updated_at, id");
-    const visits = await pool.query("SELECT data FROM dentrecall_visits ORDER BY updated_at, id");
+    const patients = await pool.query("SELECT data FROM patients WHERE profile_id = $1 ORDER BY updated_at, id", [profileId]);
+    const visits = await pool.query("SELECT data FROM visits WHERE profile_id = $1 ORDER BY updated_at, id", [profileId]);
     return sendJson(res, 200, {
       patients: patients.rows.map(row => row.data),
       visits: visits.rows.map(row => row.data)
@@ -77,18 +82,18 @@ async function handleApi(req, res) {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      await client.query("DELETE FROM dentrecall_visits");
-      await client.query("DELETE FROM dentrecall_patients");
+      await client.query("DELETE FROM visits WHERE profile_id = $1", [profileId]);
+      await client.query("DELETE FROM patients WHERE profile_id = $1", [profileId]);
       for (const patient of data.patients) {
         await client.query(
-          "INSERT INTO dentrecall_patients (id, data) VALUES ($1, $2::jsonb)",
-          [patient.id, JSON.stringify(patient)]
+          "INSERT INTO patients (profile_id, id, data) VALUES ($1, $2, $3::jsonb)",
+          [profileId, patient.id, JSON.stringify(patient)]
         );
       }
       for (const visit of data.visits) {
         await client.query(
-          "INSERT INTO dentrecall_visits (id, patient_id, data) VALUES ($1, $2, $3::jsonb)",
-          [visit.id, visit.patientId, JSON.stringify(visit)]
+          "INSERT INTO visits (profile_id, id, patient_id, data) VALUES ($1, $2, $3, $4::jsonb)",
+          [profileId, visit.id, visit.patientId, JSON.stringify(visit)]
         );
       }
       await client.query("COMMIT");
