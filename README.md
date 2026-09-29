@@ -10,3 +10,5 @@ npm.cmd start
 ```
 
 Open http://localhost:3000.
+
+Production deployment runs on Render with Neon PostgreSQL.
