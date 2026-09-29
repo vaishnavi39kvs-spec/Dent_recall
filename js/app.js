@@ -69,25 +69,26 @@ function billing(patient){
 }
 async function saveDB(){
   const data={patients:state.patients,visits:state.visits};
-  localStorage.setItem(DB_KEY, JSON.stringify(data));
-  const response=await fetch(API_STATE_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
-  if(!response.ok) throw new Error("Database save failed.");
+  await apiRequest(API_STATE_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
+  localStorage.setItem(DB_KEY,JSON.stringify(data));
 }
 async function loadDB(){
-  try{
-    const response=await fetch(API_STATE_URL);
-    if(!response.ok) throw new Error("Database load failed.");
-    const data=await response.json();
-    state.patients=Array.isArray(data.patients)?data.patients:[];
-    state.visits=Array.isArray(data.visits)?data.visits:[];
-    localStorage.setItem(DB_KEY,JSON.stringify({patients:state.patients,visits:state.visits}));
-  }catch(e){
-    try{
-      const data=JSON.parse(localStorage.getItem(DB_KEY)||"{}");
-      state.patients=Array.isArray(data.patients)?data.patients:[];
-      state.visits=Array.isArray(data.visits)?data.visits:[];
-    }catch(localError){ state.patients=[];state.visits=[]; }
-  }
+  const data=await apiRequest(API_STATE_URL);
+  state.patients=Array.isArray(data.patients)?data.patients:[];
+  state.visits=Array.isArray(data.visits)?data.visits:[];
+  localStorage.setItem(DB_KEY,JSON.stringify({patients:state.patients,visits:state.visits}));
+}
+async function apiRequest(url,options={}){
+  let response;
+  try{ response=await fetch(url,options); }
+  catch(error){ throw new Error("Cannot reach the Render API. Deploy this project as a Web Service."); }
+  let body={};
+  try{ body=await response.json(); }catch(error){}
+  if(!response.ok) throw new Error(body.error||`API request failed (${response.status}).`);
+  return body;
+}
+function showDatabaseError(error){
+  document.getElementById("app").innerHTML=`<div class="auth-wrap"><div class="auth-card"><h1>Database connection failed</h1><p class="text-muted">${esc(error.message)}</p><p class="small">Check Render's <code>DATABASE_URL</code> environment variable and deploy as a Web Service.</p><button class="btn btn-primary w-100" onclick="location.reload()">Try again</button></div></div>`;
 }
 function isLoggedIn(){ return localStorage.getItem(SESSION_KEY)==="true"; }
 function toast(msg){
@@ -148,7 +149,7 @@ function renderAuth(){
     if(users.length && !account){ alert("No account was found with this email. Please use Sign up first."); return; }
     if(account && account.password!==password){ alert("Incorrect password."); return; }
     localStorage.setItem(SESSION_KEY,"true");
-    renderApp();
+    renderApp().catch(showDatabaseError);
   });
   document.getElementById("openSignupBtn").onclick=()=>{
     document.getElementById("signupForm").reset();
@@ -192,7 +193,6 @@ async function renderApp(){
         </div>
         <div class="d-flex align-items-center gap-2">
           <span class="badge text-bg-success d-none d-md-inline"><i class="bi bi-circle-fill me-1" style="font-size:7px"></i> Neon database</span>
-                    <span class="badge text-bg-success d-none d-md-inline"><i class="bi bi-circle-fill me-1" style="font-size:7px"></i> Neon database</span>
           <button class="btn btn-outline-secondary btn-sm" id="exportBtn" title="Export CSV"><i class="bi bi-download"></i></button>
           <button class="btn btn-outline-secondary btn-sm" id="logoutBtn" title="Sign out"><i class="bi bi-box-arrow-right"></i></button>
         </div>
@@ -452,7 +452,7 @@ document.getElementById("patientForm").addEventListener("submit",async e=>{
     toast("Patient added successfully.");
   }
   try{ await saveDB(); patientModal.hide(); await renderApp(); }
-  catch(error){ alert("Patient saved locally, but the database could not be reached."); }
+  catch(error){ alert(`Patient was not saved: ${error.message}`); }
 });
 
 /* ---------- Patient Detail ---------- */
@@ -538,7 +538,7 @@ function deletePatient(id){
   if(!p||!confirmDelete(`Delete ${p.name} and all its visit records?`))return;
   state.patients=state.patients.filter(x=>x.id!==id);
   state.visits=state.visits.filter(v=>v.patientId!==id);
-  saveDB().then(()=>{detailModal.hide();renderApp();toast("Patient deleted.");}).catch(()=>alert("Patient deleted locally, but the database could not be reached."));
+  saveDB().then(()=>{detailModal.hide();renderApp().catch(showDatabaseError);toast("Patient deleted.");}).catch(error=>alert(`Patient was not deleted: ${error.message}`));
 }
 
 /* ---------- Visit CRUD ---------- */
@@ -617,7 +617,7 @@ document.getElementById("visitForm").addEventListener("submit",async e=>{
     renderDetail();
     renderMetrics();
     renderPatients();
-  }catch(error){ alert("Visit saved locally, but the database could not be reached."); }
+  }catch(error){ alert(`Visit was not saved: ${error.message}`); }
 });
 async function deleteVisit(id,patientId){
   if(!confirmDelete("Delete this visit and recalculate the billing timeline?"))return;
@@ -628,7 +628,7 @@ async function deleteVisit(id,patientId){
     renderDetail();
     renderMetrics();
     renderPatients();
-  }catch(error){ alert("Visit deleted locally, but the database could not be reached."); }
+  }catch(error){ alert(`Visit was not deleted: ${error.message}`); }
 }
 
 /* ---------- CSV Export ---------- */
@@ -646,4 +646,4 @@ function exportCSV(){
 }
 
 /* ---------- Start ---------- */
-if(isLoggedIn()){renderApp();}else{renderAuth();}
+if(isLoggedIn()){renderApp().catch(showDatabaseError);}else{renderAuth();}
