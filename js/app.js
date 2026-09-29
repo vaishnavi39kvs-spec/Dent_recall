@@ -619,10 +619,16 @@ document.getElementById("visitForm").addEventListener("submit",async e=>{
     renderPatients();
   }catch(error){ alert("Visit saved locally, but the database could not be reached."); }
 });
-function deleteVisit(id,patientId){
+async function deleteVisit(id,patientId){
   if(!confirmDelete("Delete this visit and recalculate the billing timeline?"))return;
   state.visits=state.visits.filter(v=>v.id!==id);
-  saveDB();toast("Visit deleted and billing recalculated.");renderDetail();renderMetrics();renderPatients();
+  try{
+    await saveDB();
+    toast("Visit deleted and billing recalculated.");
+    renderDetail();
+    renderMetrics();
+    renderPatients();
+  }catch(error){ alert("Visit deleted locally, but the database could not be reached."); }
 }
 
 /* ---------- CSV Export ---------- */
