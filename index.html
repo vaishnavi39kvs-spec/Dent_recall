@@ -1,0 +1,172 @@
+  <footer>Built with HTML + CSS + Bootstrap + vanilla JavaScript. Data is stored in Neon PostgreSQL.</footer>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DentRecall - Dental Clinic Recall & Billing</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+
+</head>
+
+<body>
+<div id="app"></div>
+
+<!-- Sign Up Modal -->
+<div class="modal fade" id="signupModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div><h5 class="modal-title">Create DentRecall account</h5><small class="text-muted">Set up your clinic/staff profile</small></div>
+        <button class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="signupForm">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Full name *</label><input id="signupName" class="form-control" required></div>
+            <div class="col-md-6"><label class="form-label">Clinic name *</label><input id="signupClinic" class="form-control" required></div>
+            <div class="col-md-6"><label class="form-label">Email *</label><input id="signupEmail" type="email" class="form-control" required></div>
+            <div class="col-md-6"><label class="form-label">Password *</label><input id="signupPassword" type="password" minlength="6" class="form-control" required placeholder="At least 6 characters"></div>
+            <div class="col-12">
+              <label class="form-label">Dental specialization(s) *</label>
+              <select id="signupSpecializations" class="form-select" multiple size="7" required>
+                <option value="Oral Medicine and Radiology">Oral Medicine and Radiology</option>
+                <option value="Pedodontics">Pedodontics</option>
+                <option value="Oral and Maxillofacial Surgery">Oral and Maxillofacial Surgery</option>
+                <option value="Conservative Dentistry and Endodontics">Conservative Dentistry and Endodontics</option>
+                <option value="Prosthodontics">Prosthodontics</option>
+                <option value="Periodontics">Periodontics</option>
+                <option value="Orthodontics">Orthodontics</option>
+              </select>
+              <div class="form-text">Hold Ctrl (Windows) or Command (Mac) while clicking to select multiple specializations.</div>
+              <div id="signupSpecializationHint" class="selected-specializations mt-2"></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary">Create account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Patient Modal -->
+<div class="modal fade" id="patientModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="patientModalTitle">Add new patient</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="patientForm">
+        <div class="modal-body">
+          <input type="hidden" id="patientId">
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Patient name *</label><input id="pName" class="form-control" required></div>
+            <div class="col-md-6"><label class="form-label">Phone *</label><input id="pPhone" class="form-control" required pattern="[0-9]{10}" maxlength="10" placeholder="10-digit phone"></div>
+            <div class="col-md-4"><label class="form-label">Age</label><input id="pAge" type="number" min="0" max="120" class="form-control"></div>
+            <div class="col-md-4"><label class="form-label">Gender</label><select id="pGender" class="form-select"><option>Female</option><option>Male</option><option>Other</option></select></div>
+            <div class="col-md-4"><label class="form-label">First consultation date *</label><input id="pFirstDate" type="date" class="form-control" required></div>
+            <div class="col-md-6"><label class="form-label">Recall date *</label><input id="pRecallDate" type="date" class="form-control" required></div>
+            <div class="col-md-6"><label class="form-label">Specialization *</label><select id="pSpecialization" class="form-select" required>
+              <option value="">Select specialization</option>
+              <option>Oral Medicine and Radiology</option>
+              <option>Pedodontics</option>
+              <option>Oral and Maxillofacial Surgery</option>
+              <option>Conservative Dentistry and Endodontics</option>
+              <option>Prosthodontics</option>
+              <option>Periodontics</option>
+              <option>Orthodontics</option>
+            </select></div>
+            <div class="col-md-6"><label class="form-label">Tooth number / Area to be treated</label><input id="pToothArea" class="form-control" placeholder="e.g., 11, 36, upper left posterior region, full mouth"></div>
+
+            <div class="col-12"><div class="form-section-title">Estimated bill</div></div>
+            <div class="col-md-4"><label class="form-label">Consultation charges (₹)</label><input id="pEstimateConsultation" type="number" min="0" step="1" class="form-control"></div>
+            <div class="col-md-4"><label class="form-label">IOPA charges (₹)</label><input id="pEstimateIopa" type="number" min="0" step="1" class="form-control"></div>
+            <div class="col-md-4"><label class="form-label">Treatment cost (₹)</label><input id="pEstimateTreatment" type="number" min="0" step="1" class="form-control"></div>
+            <div class="col-12"><div class="estimated-total-box d-flex justify-content-between align-items-center"><span>Total estimated billing amount</span><strong id="pEstimateTotal">₹0</strong></div></div>
+
+            <div class="col-12"><label class="form-label">Address</label><input id="pAddress" class="form-control"></div>
+            <div class="col-12"><label class="form-label">Diagnosis / clinical findings</label><textarea id="pDiagnosis" rows="2" class="form-control"></textarea></div>
+            <div class="col-12"><label class="form-label">Treatment plan</label><textarea id="pPlan" rows="2" class="form-control"></textarea></div>
+            <div class="col-12"><label class="form-label">Prescription</label><textarea id="pPrescription" rows="3" class="form-control" placeholder="Enter medicines, dosage, duration and instructions"></textarea></div>
+            <div class="col-12"><div class="form-section-title">First visit payment & balance</div></div>
+            <div class="col-md-6"><label class="form-label">Paid amount for this visit (₹)</label><input id="pInitialPaid" type="number" min="0" step="1" class="form-control"></div>
+            <div class="col-md-6"><label class="form-label">Balance after this visit</label><div class="outstanding h-100 d-flex align-items-center"><strong id="pInitialBalance">₹0</strong></div></div>
+            <div class="col-md-6"><label class="form-label">Appointment status</label><select id="pAppointmentStatus" class="form-select"><option value="pending">Pending</option><option value="completed">Completed</option><option value="rescheduled">Rescheduled</option><option value="missed">Missed</option></select></div>
+            <div class="col-md-3"><label class="form-label">Next appointment</label><input id="pNextAppointment" type="date" class="form-control"></div>
+            <div class="col-md-3"><label class="form-label">Time</label><input id="pNextAppointmentTime" type="time" class="form-control"></div>
+            <div class="col-md-6"><label class="form-label">Recall status</label><select id="pRecallStatus" class="form-select"><option value="pending">Pending</option><option value="completed">Completed</option><option value="missed">Missed</option><option value="rescheduled">Rescheduled</option></select></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" id="savePatientBtn">Save patient</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Visit Modal -->
+<div class="modal fade" id="visitModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div><h5 class="modal-title" id="visitModalTitle">Add visit & payment</h5><small id="visitPatientName" class="text-muted"></small></div>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="visitForm">
+        <div class="modal-body">
+          <input type="hidden" id="visitId">
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Visit date *</label><input id="vDate" type="date" class="form-control" required></div>
+            <div class="col-md-6"><label class="form-label">Consultation charge (₹)</label><input id="vConsult" type="number" min="0" step="1" class="form-control"></div>
+            <div class="col-md-6"><label class="form-label">IOPA charge (₹)</label><input id="vIopa" type="number" min="0" step="1" class="form-control"></div>
+            <div class="col-md-6"><label class="form-label">Additional charge (₹)</label><input id="vAdditional" type="number" min="0" step="1" class="form-control"></div>
+            <div class="col-12"><label class="form-label">Additional charge description</label><input id="vAdditionalNote" class="form-control" placeholder="e.g. temporary restoration, extra radiograph"></div>
+            <div class="col-md-6"><label class="form-label">Payment received today (₹)</label><input id="vPayment" type="number" min="0" step="1" class="form-control"></div>
+            <div class="col-md-6"><label class="form-label">Payment method</label><select id="vMethod" class="form-select"><option>UPI</option><option>Cash</option><option>Card</option><option>Bank Transfer</option><option>Other</option></select></div>
+            <div class="col-12"><div class="outstanding d-flex justify-content-between align-items-center"><span>Outstanding after this visit</span><strong id="visitOutstanding">₹0</strong></div></div>
+            <div class="col-12"><label class="form-label">Treatment / procedure done</label><textarea id="vTreatment" rows="2" class="form-control"></textarea></div>
+            <div class="col-12"><label class="form-label">Notes</label><textarea id="vNotes" rows="2" class="form-control"></textarea></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" id="saveVisitBtn">Save visit & payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Patient Detail Modal -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="detailTitle">Patient</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body" id="detailBody"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <div id="toast" class="toast align-items-center border-0" role="alert">
+    <div class="d-flex"><div class="toast-body" id="toastText"></div><button class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script src="js/app.js"></script>
+
+</body>
+</html>
